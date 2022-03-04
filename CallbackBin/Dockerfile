@@ -1,6 +1,6 @@
 FROM mcr.microsoft.com/dotnet/core/aspnet:3.1 AS base
 WORKDIR /app
-EXPOSE 80
+EXPOSE 5000
 
 FROM mcr.microsoft.com/dotnet/core/sdk:3.1 AS build
 WORKDIR /src
@@ -14,7 +14,22 @@ RUN dotnet build "CallbackBin.csproj" -c Release -o /app/build
 FROM build AS publish
 RUN dotnet publish "CallbackBin.csproj" -c Release -o /app/publish
 
+
 FROM base AS final
-WORKDIR /app
+LABEL maintainer="vukasin@infaloom.com"
+
+## using high UID to avoid possible correlation with k8s host UID
+## https://kubesec.io/basics/containers-securitycontext-runasuser/
+RUN adduser \
+        --uid 10000 \
+        --shell /bin/sh \
+        --home /app \
+        --no-create-home \
+        --disabled-password \
+        --gecos "runuser" \
+        runuser
+
 COPY --from=publish /app/publish .
-ENTRYPOINT ["dotnet", "CallbackBin.dll"]
+USER 10000:10000
+
+CMD ["dotnet", "CallbackBin.dll"]
